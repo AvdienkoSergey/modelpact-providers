@@ -1,6 +1,6 @@
 {
   "name": "modelpact-providers",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Language-model backends written against the modelpact contract — one transport per runtime, each green on the contract suite",
   "keywords": [
     "llm",
