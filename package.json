@@ -1,0 +1,59 @@
+{
+  "name": "modelpact-providers",
+  "version": "0.0.0",
+  "description": "Backends for modelpact",
+  "keywords": [
+    "llm",
+    "modelpact",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Sergey Avdienko",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AvdienkoSergey/modelpact-providers.git"
+  },
+  "homepage": "https://github.com/AvdienkoSergey/modelpact-providers#readme",
+  "bugs": {
+    "url": "https://github.com/AvdienkoSergey/modelpact-providers/issues"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "modelpact": ">=2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.4.1",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "modelpact": "^2.2.0",
+    "prettier": "^3.9.6",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
+  }
+}
