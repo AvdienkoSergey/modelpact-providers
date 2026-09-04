@@ -1,11 +1,17 @@
 {
   "name": "modelpact-providers",
   "version": "0.0.0",
-  "description": "Backends for modelpact",
+  "description": "Language-model backends written against the modelpact contract — one transport per runtime, each green on the contract suite",
   "keywords": [
     "llm",
     "modelpact",
-    "typescript"
+    "typescript",
+    "ollama",
+    "prompt-api",
+    "webgpu",
+    "on-device",
+    "adapter",
+    "contract-testing"
   ],
   "license": "MIT",
   "author": "Sergey Avdienko",

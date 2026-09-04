@@ -1,6 +1,6 @@
 # modelpact-providers
 
-Backends for modelpact
+Language-model backends written against the modelpact contract — one transport per runtime, each green on the contract suite
 
 ## Install
 
