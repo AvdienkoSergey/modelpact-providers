@@ -28,6 +28,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./webgpu": {
+      "types": "./dist/webgpu.d.ts",
+      "import": "./dist/webgpu.js"
     }
   },
   "files": [
@@ -38,6 +42,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "prepare": "patch-package",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -45,21 +50,31 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.patched.json",
+    "check:surface": "npm run build && tsc -p tsconfig.surface.json",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "modelpact": ">=2"
+    "modelpact": ">=2.2",
+    "@mlc-ai/web-llm": ">=0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@mlc-ai/web-llm": "^0.2.84",
+    "@types/dom-chromium-ai": "^0.0.17",
     "@types/node": "^26.4.1",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "modelpact": "^2.2.0",
+    "patch-package": "^8.0.1",
     "prettier": "^3.9.6",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.69.0",
     "vitest": "^4.1.11"
+  },
+  "peerDependenciesMeta": {
+    "@mlc-ai/web-llm": {
+      "optional": true
+    }
   }
 }

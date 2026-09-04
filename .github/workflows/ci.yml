@@ -20,14 +20,67 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # `npm ci` runs `prepare`, which is patch-package, which the patched
+      # dom-chromium-ai declarations depend on.
       - run: npm ci
 
+      # One job rather than four, so the install is paid once. `!cancelled()`
+      # keeps the later steps running after an earlier failure — a red run then
+      # names every problem instead of only the first.
       - run: npm run typecheck
       - if: ${{ !cancelled() }}
         run: npm run lint
       - if: ${{ !cancelled() }}
         run: npm run format:check
+      # No daemon on this runner, so the Ollama contract suite skips here; the
+      # `ollama` job below is what makes that skip a fact about the environment.
       - if: ${{ !cancelled() }}
         run: npm test
+      # Builds first, then reads the declarations back with `skipLibCheck` off
+      # and no ambient types — a consumer's seat. It covers `npm run build`,
+      # which is why that is not a step of its own.
       - if: ${{ !cancelled() }}
-        run: npm run build
+        run: npm run check:surface
+
+  # The same suites again, with a daemon answering. Its own job because
+  # installing Ollama and pulling weights costs more than everything above put
+  # together, and because it should be able to go red on its own: a backend
+  # that stops matching the daemon is a fact about the daemon's shapes, not
+  # about the contract.
+  ollama:
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ubuntu-latest
+    env:
+      # 708MB, and the smallest thing that still answers in words.
+      OLLAMA_MODEL: granite4:350m
+      # The daemon's own default is a system path the cache below cannot reach.
+      OLLAMA_MODELS: /home/runner/.ollama/models
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - run: curl -fsSL https://ollama.com/install.sh | sh
+      # Weights, not the binary: the pull below is a no-op on a hit and the
+      # whole download on a miss.
+      - uses: actions/cache@v6
+        with:
+          path: /home/runner/.ollama/models
+          key: ollama-models-granite4-350m
+
+      - name: Serve, and pull if the cache missed
+        run: |
+          # The installer starts its own under systemd, with models somewhere
+          # this job does not cache — ours replaces it rather than fights it.
+          sudo systemctl stop ollama || true
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:11434/api/tags > /dev/null && break
+            sleep 1
+          done
+          ollama pull "$OLLAMA_MODEL"
+
+      - run: npm test

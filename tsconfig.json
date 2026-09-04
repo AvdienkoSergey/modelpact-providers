@@ -16,7 +16,16 @@
     "verbatimModuleSyntax": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    // On, and it costs something: `@mlc-ai/web-llm` ships declarations that
+    // name packages it does not depend on, so the whole project cannot be
+    // checked with it off. `tsconfig.patched.json` puts it back for everything
+    // but that backend, which is where the patched `@types/dom-chromium-ai`
+    // has to hold.
+    "skipLibCheck": true,
+    "types": ["node", "dom-chromium-ai"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  // `surface.ts` reads `../dist`, which exists only after a build; it is
+  // compiled by `tsconfig.surface.json` and by nothing else.
+  "exclude": ["src/surface.ts"]
 }

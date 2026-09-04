@@ -1,0 +1,10 @@
+{
+  // The published declarations — this package's and the engine's — read the
+  // way a consumer reads them: `skipLibCheck` off, and no ambient types handed
+  // over for free. Only `src/surface.ts`, so a third party's broken `.d.ts`
+  // cannot drown out ours.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "skipLibCheck": false, "types": [] },
+  "include": ["src/surface.ts"],
+  "exclude": []
+}
