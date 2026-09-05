@@ -109,6 +109,22 @@ const parseJson = (text: string): unknown => {
   }
 };
 
+/**
+ * `baseUrl` without its trailing slashes, walked rather than matched.
+ *
+ * `/\/+$/` is a polynomial backtrack: on a long run of slashes the engine
+ * retries the greedy `\/+` from every position in it before `$` can fail. That
+ * is harmless on a URL somebody typed into a config and not harmless as a
+ * published API, where a consumer is free to build this string from something a
+ * user sent — which is what CodeQL means by uncontrolled, and it is right. An
+ * index walk is linear and says plainly what it does.
+ */
+const withoutTrailingSlashes = (url: string): string => {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end -= 1;
+  return url.slice(0, end);
+};
+
 interface Endpoint {
   readonly baseUrl: string;
   readonly headers: Record<string, string>;
@@ -116,7 +132,7 @@ interface Endpoint {
 }
 
 const toEndpoint = (config: OpenAiConfig): Endpoint => ({
-  baseUrl: (config.baseUrl ?? DEFAULTS.baseUrl).replace(/\/+$/, ""),
+  baseUrl: withoutTrailingSlashes(config.baseUrl ?? DEFAULTS.baseUrl),
   headers:
     config.apiKey === undefined
       ? {}

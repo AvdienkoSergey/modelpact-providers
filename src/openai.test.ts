@@ -377,18 +377,30 @@ describe("openai against a server made of strings", () => {
     expect(seenHeaders[1]?.authorization).toBe("Bearer sk-test");
   });
 
-  test("a trailing slash on the base url is not doubled into the path", async () => {
+  test("trailing slashes on the base url are not doubled into the path", async () => {
     const seenUrls: string[] = [];
-    const provider = makeOpenAiProvider({
-      model: MODEL,
-      baseUrl: "http://example.test/v1/",
-      fetch: (input) => {
-        seenUrls.push(toUrl(input));
-        return Promise.resolve(makeModelsResponse(MODEL));
-      },
-    });
-    await provider.access();
-    expect(seenUrls[0]).toBe("http://example.test/v1/models");
+    const askWith = async (baseUrl: string) => {
+      await makeOpenAiProvider({
+        model: MODEL,
+        baseUrl,
+        fetch: (input) => {
+          seenUrls.push(toUrl(input));
+          return Promise.resolve(makeModelsResponse(MODEL));
+        },
+      }).access();
+    };
+
+    await askWith("http://example.test/v1/");
+    // A run of them, because trimming used to be `/\/+$/` — a polynomial
+    // backtrack on a string a consumer may well have built from user input.
+    await askWith(`http://example.test/v1${"/".repeat(5_000)}`);
+    await askWith("http://example.test/v1");
+
+    expect(seenUrls).toEqual([
+      "http://example.test/v1/models",
+      "http://example.test/v1/models",
+      "http://example.test/v1/models",
+    ]);
   });
 
   test("the answer arrives in frames, and keep-alives are not frames", async () => {
