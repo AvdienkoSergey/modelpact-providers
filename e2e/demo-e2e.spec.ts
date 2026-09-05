@@ -92,17 +92,28 @@ function takeNetworkRefusals(errors: string[]): string[] {
   return refusals;
 }
 
-/** Asked from node, not the page: the spec skips rather than fails where no daemon runs. */
-async function daemonAnswers(): Promise<boolean> {
+/** Asked from node, not the page: the specs skip rather than fail where no daemon runs. */
+async function probeDaemon(): Promise<boolean> {
   try {
     const response = await fetch("http://127.0.0.1:11434/api/tags", {
-      signal: AbortSignal.timeout(2_000),
+      signal: AbortSignal.timeout(5_000),
     });
     return response.ok;
   } catch {
     return false;
   }
 }
+
+let daemonProbe: Promise<boolean> | null = null;
+
+/**
+ * Once per run, not once per spec. Seven specs ask, and a daemon busy
+ * generating for the previous one can miss the probe's window — which shows up
+ * as a spec silently skipping rather than failing, and a suite that quietly
+ * covers less than its output claims. Measured: one run in six lost a spec that
+ * way before this was cached.
+ */
+const daemonAnswers = (): Promise<boolean> => (daemonProbe ??= probeDaemon());
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");

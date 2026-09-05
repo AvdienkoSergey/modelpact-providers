@@ -48,6 +48,47 @@ changes the backend and every other line stays as it was.
 > `modelpact@2.2.x`, from before they moved here. This app takes them from this
 > package on purpose — that import line is the thing being demonstrated.
 
+## Pointing it at hosted OpenAI
+
+The `openai` entry reaches the local daemon by default. Export a key and the
+same entry reaches `api.openai.com` instead — no tracked file to edit:
+
+```sh
+read -rs "OPENAI_API_KEY?OpenAI API key: " && export OPENAI_API_KEY
+export OPENAI_MODEL=gpt-4o-mini   # optional; that is the default
+npm run demo
+```
+
+The label in the picker changes to `OpenAI · gpt-4o-mini`, which is the only
+way to tell which server is behind that entry without opening the network
+panel.
+
+> The key is the one from [platform.openai.com](https://platform.openai.com/api-keys),
+> billed separately. A ChatGPT subscription does not come with one.
+
+**The key never reaches the page.** [`vite.config.ts`](vite.config.ts) reads it
+in Node and attaches it to a `/openai` proxy; the page is told two things and
+neither is the key — that hosting is on, and which model to ask for. Checked
+rather than asserted: a production build with the key exported contains neither
+the key nor the hosted path.
+
+Three things this deliberately does not do.
+
+**It does not survive a build.** The proxy is a dev-server feature, so hosted
+mode is gated on `command === "serve"`. A built page told it was hosted would
+fetch `/openai/v1` from whatever serves the static files and get a 404; instead
+it falls back to the daemon, and the hosted branch is dropped from the bundle
+entirely.
+
+**It does not reach the test suite.**
+[`playwright.config.ts`](../playwright.config.ts) blanks `OPENAI_API_KEY` for
+the dev server it starts. A contributor with a key exported in their shell
+should not discover that by being billed for a suite that generates on it.
+
+**It does not move `openai-narrow`.** That entry stays on the daemon whatever
+the one above does: overflowing a window takes turns, and turns on a hosted
+model are billed.
+
 ## Why it is a workspace, and not its own install
 
 Both this app and `modelpact-providers` reach for `modelpact`. Installed

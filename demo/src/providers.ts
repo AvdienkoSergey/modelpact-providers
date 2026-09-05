@@ -26,9 +26,27 @@ import {
 } from "modelpact-providers";
 import { makeWebGpuProvider } from "modelpact-providers/webgpu";
 
-/** One daemon, and the two entries below reach it through different doors. */
+/** One daemon, and two of the entries below reach it through different doors. */
 const LOCAL_MODEL = "granite4:350m";
 const LOCAL_OPENAI_BASE_URL = "http://127.0.0.1:11434/v1";
+
+/**
+ * Where the `openai` entry points, and it is the dev server that decides.
+ *
+ * Export `OPENAI_API_KEY` before `npm run demo` and `vite.config.ts` proxies
+ * `/openai` to `api.openai.com`, attaching the key in Node where the page
+ * cannot see it. Without one there is no proxy and the entry stays on the
+ * daemon, which is what keeps this repository's default a demo that costs
+ * nothing to run.
+ *
+ * The key never appears here, and could not: this file is bundled and served.
+ */
+const HOSTED = import.meta.env.VITE_OPENAI_HOSTED;
+const HOSTED_MODEL = import.meta.env.VITE_OPENAI_MODEL;
+
+const OPENAI_CONFIG = HOSTED
+  ? { model: HOSTED_MODEL, baseUrl: "/openai/v1" }
+  : { model: LOCAL_MODEL, baseUrl: LOCAL_OPENAI_BASE_URL };
 
 export const PROVIDERS = defineProviders({
   // A daemon on this machine, over `fetch` and JSON. Absent one, `access`
@@ -37,15 +55,16 @@ export const PROVIDERS = defineProviders({
   // The same daemon, the same model, `/v1/chat/completions` instead of
   // `/api/chat`. That is the entry: `baseUrl` moves it, `apiKey` is optional,
   // and a page needs no secret to show it. Put the two side by side in the
-  // network panel and the only difference is the URL.
-  openai: makeOpenAiProvider({
-    model: LOCAL_MODEL,
-    baseUrl: LOCAL_OPENAI_BASE_URL,
-  }),
+  // network panel and the only difference is the URL — and with a key exported,
+  // that URL is the only thing that changes to reach a hosted model instead.
+  openai: makeOpenAiProvider(OPENAI_CONFIG),
   // The window here is a budget the caller declares, not one the server loaded
   // — no server in this dialect takes one — so a narrow one is staged by
   // declaring it and letting the counts cross it on the first turn. It is what
   // a mock used to be here for, done by a real transport instead.
+  //
+  // Pinned to the daemon whatever the entry above does: overflowing a window
+  // takes turns, and turns on a hosted model are billed.
   "openai-narrow": makeOpenAiProvider({
     model: LOCAL_MODEL,
     baseUrl: LOCAL_OPENAI_BASE_URL,
@@ -71,7 +90,11 @@ export function getProviderLabel(providerName: ProviderName): string {
     case "ollama":
       return "Ollama · granite4:350m";
     case "openai":
-      return "OpenAI dialect · 127.0.0.1/v1";
+      // The label is the only place a person can tell which server is behind
+      // this entry without opening the network panel.
+      return HOSTED
+        ? `OpenAI · ${HOSTED_MODEL}`
+        : "OpenAI dialect · 127.0.0.1/v1";
     case "openai-narrow":
       return "OpenAI dialect · narrow window";
     case "prompt-api":

@@ -194,6 +194,11 @@ package from `file:..` through its own `exports` — so what runs in the page is
 workspace of this repository; the reason that matters, and what breaks without
 it, is in [`demo/README.md`](demo/README.md).
 
+Export `OPENAI_API_KEY` before `npm run demo` and the `openai` entry reaches
+`api.openai.com` instead of the daemon, through a dev-server proxy that holds
+the key in Node — the page is never told it, and a build never carries it. See
+[`demo/README.md`](demo/README.md#pointing-it-at-hosted-openai).
+
 It also type-checks itself with `types: ["vite/client"]` and nothing else,
 which makes it the second half of the surface guard above: a declaration that
 needs an ambient global fails in an app that never installed one.
