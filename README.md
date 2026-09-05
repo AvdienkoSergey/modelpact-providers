@@ -6,14 +6,15 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 **The transports for [modelpact](https://github.com/AvdienkoSergey/modelpact):
-a daemon on your machine, the model inside Chrome, and a model in the tab
-itself. Three backends, one dialect, and the contract suite green on each.**
+a daemon on your machine, any OpenAI-compatible server, the model inside
+Chrome, and a model in the tab itself. Four backends, one contract, and that
+contract's suite green on each.**
 
 The engine holds the contract, the lifecycle and one backend with nothing
 behind it. This package holds the ones with something behind them. They are
-apart because they change for different reasons: a daemon's JSON, a browser's
-origin trial and a WebGPU runtime each move on their own clock, and none of
-them should move the contract.
+apart because they change for different reasons: a daemon's JSON, a hosted
+API's dialect, a browser's origin trial and a WebGPU runtime each move on their
+own clock, and none of them should move the contract.
 
 ## Install
 
@@ -24,13 +25,14 @@ npm install modelpact-providers modelpact
 `modelpact` is a peer dependency: this package is written against its contract
 and carries no copy of it.
 
-## The three
+## The four
 
-| Provider                | Reaches                           | Wants                                   | Import from                  |
-| ----------------------- | --------------------------------- | --------------------------------------- | ---------------------------- |
-| `makeOllamaProvider`    | a daemon over HTTP, usually local | Ollama on `127.0.0.1:11434`             | `modelpact-providers`        |
-| `makePromptApiProvider` | Chrome's built-in Gemini Nano     | Chrome, and the weights downloaded once | `modelpact-providers`        |
-| `makeWebGpuProvider`    | a model in the tab, on WebGPU     | `@mlc-ai/web-llm`, and a GPU            | `modelpact-providers/webgpu` |
+| Provider                | Reaches                                   | Wants                                              | Import from                  |
+| ----------------------- | ----------------------------------------- | -------------------------------------------------- | ---------------------------- |
+| `makeOllamaProvider`    | a daemon over HTTP, usually local         | Ollama on `127.0.0.1:11434`                        | `modelpact-providers`        |
+| `makeOpenAiProvider`    | anything speaking the OpenAI HTTP dialect | a `baseUrl`; a key only where the server wants one | `modelpact-providers`        |
+| `makePromptApiProvider` | Chrome's built-in Gemini Nano             | Chrome, and the weights downloaded once            | `modelpact-providers`        |
+| `makeWebGpuProvider`    | a model in the tab, on WebGPU             | `@mlc-ai/web-llm`, and a GPU                       | `modelpact-providers/webgpu` |
 
 ```ts
 import { makeOllamaProvider } from "modelpact-providers";
@@ -41,14 +43,15 @@ const opened = await access.open({ system: "Answer in one sentence." });
 ```
 
 Everything after the provider line is the contract's, and identical across the
-three — see [modelpact's README](https://github.com/AvdienkoSergey/modelpact#readme)
+four — see [modelpact's README](https://github.com/AvdienkoSergey/modelpact#readme)
 for what a session promises.
 
 ## Two entries, and the reason
 
-`modelpact-providers` is the two that cost a consumer nothing: `fetch` and JSON
-for the daemon, a global for the browser's own model, no runtime dependency
-behind either. `modelpact-providers/webgpu` is the third, because it carries
+`modelpact-providers` is the three that cost a consumer nothing: `fetch` and
+JSON for the daemon and for the OpenAI dialect, a global for the browser's own
+model, no runtime dependency behind any of them.
+`modelpact-providers/webgpu` is the fourth, because it carries
 `@mlc-ai/web-llm` — an optional peer dependency, so an app on the daemon never
 installs it. The split is by dependency, not by kind: the same reason
 `modelpact/testing` is a separate entry for `vitest`.
@@ -61,6 +64,27 @@ a running daemon, not off the docs: a chat stream is NDJSON whose last line
 carries the counts, a pull line carries `completed` and `total` per layer, and
 an error is an HTTP status with a body. The daemon keeps nothing between
 requests, so the session's record is resent whole every turn.
+
+**An OpenAI-compatible server.** A dialect rather than a company:
+`https://api.openai.com/v1` is the default and one instance of it, and the same
+two endpoints answer on vLLM, llama.cpp, LM Studio, OpenRouter, Groq and
+Ollama's own `/v1`. So `baseUrl` is the whole difference between them and
+`apiKey` is optional — a model on your machine wants no key, and a type that
+demanded one would be describing a service instead of a protocol. It is also
+the only backend here that never answers `needs-download`: the weights are the
+server's problem, and there is nothing this side could fetch.
+
+Two things the wire does that the daemon next door does not, and both are
+handled rather than assumed: a tool call arrives fragmented across frames,
+keyed by `index`, with its arguments as a JSON string rather than an object;
+and the counts arrive in a frame of their own after the last one carrying text,
+which is what `stream_options: { include_usage: true }` asks for.
+
+`contextWindow` is optional, and absent it `usage()` answers `unknown`. No
+server in this dialect reports the window it loaded a model with, so a number
+there is your declaration, not a discovery — and being a declaration is what
+makes it a budget too: a transcript past it is an overflow, told by the counts
+rather than by the server.
 
 **Chrome's built-in model.** The one backend that keeps the conversation
 itself: `LanguageModel` is a session object and `prompt()` appends to it, so
@@ -80,14 +104,15 @@ was, and it needed nothing added to the contract.
 
 ## Tools
 
-All three accept `ModelRequest.tools`, and each executes them the way its
+All four accept `ModelRequest.tools`, and each executes them the way its
 transport can.
 
-| Provider   | How a call happens                                                                                |
-| ---------- | ------------------------------------------------------------------------------------------------- |
-| Ollama     | native `tool_calls`, answered under the `tool` role, in rounds bounded by `maxToolRounds`         |
-| Prompt API | handed to `create()`, and the browser calls `execute` itself                                      |
-| WebGPU     | not yet: the request is refused at `access`, which is the contract's answer for a backend without |
+| Provider   | How a call happens                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------- |
+| Ollama     | native `tool_calls`, answered under the `tool` role, in rounds bounded by `maxToolRounds`           |
+| OpenAI     | the same, tied by `tool_call_id` rather than by name, so two calls to one tool in a turn stay apart |
+| Prompt API | handed to `create()`, and the browser calls `execute` itself                                        |
+| WebGPU     | not yet: the request is refused at `access`, which is the contract's answer for a backend without   |
 
 Chrome 152 answers `available` to `availability()` with tools and then throws
 `InvalidStateError` from `create()` — measured, and it arrives as a refusal at
@@ -144,12 +169,14 @@ actually imports and calls the things. It is where the demo caught the
 | `npm run demo:check`    | the demo's own tsconfig — a consumer with no `@types`  |
 | `npm run build`         | `dist/` — JS, declarations, maps                       |
 
-The Ollama suite wants a daemon on `127.0.0.1:11434` holding `granite4:350m`.
-Without one it skips loudly rather than passing quietly.
+The Ollama suite wants a daemon on `127.0.0.1:11434` holding `granite4:350m`,
+and the OpenAI suite wants an OpenAI-compatible server — that same daemon's
+`/v1`, by default, which is a genuine third-party implementation of the dialect
+and already there. Without one, each skips loudly rather than passing quietly.
 
 ## The demo
 
-[`demo/`](demo) is a chat with all three transports behind one picker, plus the
+[`demo/`](demo) is a chat with all four transports behind one picker, plus the
 engine's mock for the two branches a real backend cannot stage on demand.
 
 ```sh
@@ -176,7 +203,7 @@ npx playwright install chromium   # once
 npm run test:e2e                  # the demo server starts itself
 ```
 
-Twelve specs. The vitest suites next to each backend check its logic against
+Thirteen specs. The vitest suites next to each backend check its logic against
 the contract from node; these check what node cannot see:
 
 - a page is not node. `fetch` held on its own throws `Illegal invocation` in

@@ -10,9 +10,10 @@ import { expect, test } from "vitest";
 
 import * as entry from "./index.js";
 
-test("the entry offers the two dependency-free transports", () => {
+test("the entry offers the three dependency-free transports", () => {
   expect(Object.keys(entry).sort()).toEqual([
     "makeOllamaProvider",
+    "makeOpenAiProvider",
     "makePromptApiProvider",
   ]);
 });

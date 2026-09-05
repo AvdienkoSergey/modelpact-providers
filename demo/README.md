@@ -1,9 +1,10 @@
 # The demo
 
-Six backends behind one picker: three of them this package's transports — a
-daemon over HTTP, the model inside Chrome, a model in the tab on WebGPU — and
-three of them the engine's mock, which is here because two branches of
-`ModelAccess` cannot be staged on demand by a real backend.
+Seven backends behind one picker: four of them this package's transports — a
+daemon over HTTP, the same daemon in the OpenAI dialect, the model inside
+Chrome, a model in the tab on WebGPU — and three of them the engine's mock,
+which is here because two branches of `ModelAccess` cannot be staged on demand
+by a real backend.
 
 ```sh
 npm install   # from the repo root, once: this directory is a workspace
@@ -17,7 +18,11 @@ That is the whole point of the app, and it is one file —
 
 ```ts
 import { defineProviders, makeMockProvider } from "modelpact";
-import { makeOllamaProvider, makePromptApiProvider } from "modelpact-providers";
+import {
+  makeOllamaProvider,
+  makeOpenAiProvider,
+  makePromptApiProvider,
+} from "modelpact-providers";
 import { makeWebGpuProvider } from "modelpact-providers/webgpu";
 ```
 
@@ -66,6 +71,7 @@ an install ever nests a second copy anyway.
 | Reload, and it is still there       | `session.history()` out, `open({ history })` back in                            |
 | A second tab staying in step        | the `storage` event, not a contract feature                                     |
 | The `ollama` entry answering        | a real model, through the same session as the mocks                             |
+| The `openai` entry answering        | the same daemon, reached by moving `baseUrl` and nothing else                   |
 | The `prompt-api` entry              | Chrome's own model, mapped by the same four answers                             |
 | The `webgpu` entry                  | the package's second entry point, and its optional peer dependency              |
 | **Read the page** ticked            | `ModelRequest.tools`: the mock tool from `modelpact/tools`, run inside the turn |
@@ -75,6 +81,13 @@ The Ollama entry wants a daemon on `127.0.0.1:11434` holding `granite4:350m`.
 Without one it answers `unavailable` and the chip says so — no throw, no hang,
 which is the branch the mocks cannot stage.
 
+The OpenAI entry is that same daemon through `/v1`, and it is here to show what
+`baseUrl` buys: the dialect that reaches `api.openai.com` also reaches a server
+on this machine, and `apiKey` is left unset because a local one wants none.
+That is not a shortcut around a key — it is the reason the config has a
+`baseUrl` at all. A key belongs on a server you run, never in a page anyone can
+load.
+
 The Chrome entry needs no configuring. What it usually lands on is
 `needs-download`, and that branch is not opened for you: Gemini Nano is
 gigabytes, and a dropdown is not consent. The button is. The WebGPU entry sits
@@ -83,9 +96,9 @@ behind the same button, for a few hundred megabytes of its own.
 **Read the page** hands the session one tool, `pageTitle`: the mock tool from
 `modelpact/tools` with the page's title behind it. The chip says
 `ready · tools` once a session has opened with it, and each transport runs it
-the way it can — the mock when its name is in the message, Ollama natively,
-Chrome by calling `execute` itself, and WebGPU not at all, which arrives as a
-refusal rather than a silently dropped request. Each call shows in the record
+the way it can — the mock when its name is in the message, Ollama and the
+OpenAI dialect natively, Chrome by calling `execute` itself, and WebGPU not at
+all, which arrives as a refusal rather than a silently dropped request. Each call shows in the record
 as a grey line, because the record itself holds only turns.
 
 ## Where the interesting parts are

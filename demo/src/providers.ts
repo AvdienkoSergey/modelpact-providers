@@ -2,9 +2,9 @@
  * The app's list of backends. One object, and its keys are the app's provider
  * names: the switch in `getProviderLabel` below stays exhaustive because of it.
  *
- * Three of them are this package — a daemon over HTTP, the model inside
- * Chrome, a model in the tab — and three are the engine's mock with different
- * settings. The mocks are here because two branches of `ModelAccess` cannot be
+ * Four of them are this package — a daemon over HTTP, the same daemon in the
+ * OpenAI dialect, the model inside Chrome, a model in the tab — and three are
+ * the engine's mock with different settings. The mocks are here because two branches of `ModelAccess` cannot be
  * staged on demand by a real one: a window narrow enough to overflow in two
  * turns, and a download that finishes while you watch. Nothing outside this
  * file knows which is which, and that is the claim the rest of the demo exists
@@ -17,7 +17,11 @@
  */
 
 import { defineProviders, makeMockProvider } from "modelpact";
-import { makeOllamaProvider, makePromptApiProvider } from "modelpact-providers";
+import {
+  makeOllamaProvider,
+  makeOpenAiProvider,
+  makePromptApiProvider,
+} from "modelpact-providers";
 import { makeWebGpuProvider } from "modelpact-providers/webgpu";
 
 /** Long enough to watch arrive, and to reach the stop button before it ends. */
@@ -50,6 +54,15 @@ export const PROVIDERS = defineProviders({
   // A daemon on this machine, over `fetch` and JSON. Absent one, `access`
   // answers `unavailable` and the chip says so — no throw, no hang.
   ollama: makeOllamaProvider({ model: "granite4:350m" }),
+  // The OpenAI dialect, pointed at the same daemon's `/v1` rather than at
+  // `api.openai.com`. That is the entry: `baseUrl` moves it, `apiKey` is
+  // optional, and a page needs no secret to show it. A key in a bundle is a
+  // key handed to everyone who loads the page, so the one server this demo
+  // will talk to is the one on this machine.
+  openai: makeOpenAiProvider({
+    model: "granite4:350m",
+    baseUrl: "http://127.0.0.1:11434/v1",
+  }),
   // Chrome's own, which needs no configuring and no daemon. On a browser
   // without it `access` answers `unavailable`; on one with it undownloaded,
   // the weights are gigabytes, which is what the consent button exists for.
@@ -75,6 +88,8 @@ export function getProviderLabel(providerName: ProviderName): string {
       return "Mock · downloads first";
     case "ollama":
       return "Ollama · granite4:350m";
+    case "openai":
+      return "OpenAI dialect · 127.0.0.1/v1";
     case "prompt-api":
       return "Chrome · built-in model";
     case "webgpu":

@@ -47,6 +47,10 @@ jobs:
   # together, and because it should be able to go red on its own: a backend
   # that stops matching the daemon is a fact about the daemon's shapes, not
   # about the contract.
+  #
+  # One daemon, two contract suites: it serves its own dialect on `/api` and
+  # the OpenAI one on `/v1`, and the second is a third-party implementation of
+  # that dialect rather than a stand-in written here.
   ollama:
     if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest

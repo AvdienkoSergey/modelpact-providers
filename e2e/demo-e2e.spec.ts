@@ -235,25 +235,50 @@ test("the ollama entry reaches a daemon and answers", async ({ page }) => {
 });
 
 /**
- * The same backend with nothing on the other end, which is the branch most
+ * The same daemon in the other dialect: `/v1/chat/completions` rather than
+ * `/api/chat`, reached by moving `baseUrl` and nothing else. No key is
+ * configured, which is the half of the compatible shape a page can actually
+ * show — `apiKey` is optional because a local server wants none.
+ */
+test("the openai entry reaches a compatible server and answers", async ({
+  page,
+}) => {
+  test.skip(!(await daemonAnswers()), "no ollama daemon on 11434");
+
+  await page.selectOption("select", "openai");
+  await expect(chip(page)).toHaveText("ready", { timeout: 30_000 });
+  await opened(page);
+
+  await composer(page).fill("Name the capital of France in one word.");
+  await sendButton(page).click();
+  await expect(sendButton(page)).toBeVisible({ timeout: 60_000 });
+  await expect(messages(page)).toHaveCount(2);
+  await expect(messages(page).nth(1)).not.toBeEmpty();
+});
+
+/**
+ * Both HTTP transports with nothing on the other end, which is the branch most
  * people meet first.
  *
  * The connection is refused at the network rather than by skipping this where
- * no daemon runs: that way the pair above and here assert both answers on
+ * no daemon runs: that way the specs above and here assert both answers on
  * every machine, a laptop with Ollama installed included. `access` resolves to
  * a branch — never a throw, never a hang — and the `errors` fixture is what
  * says the refused connection surfaced as neither.
  */
-test("the ollama entry says unavailable rather than throwing when nothing answers", async ({
+test("the http entries say unavailable rather than throwing when nothing answers", async ({
   page,
   errors,
 }) => {
+  // One route for both: the daemon serves `/api` and `/v1` on the same port.
   await page.route("http://127.0.0.1:11434/**", (route) => route.abort());
 
-  expect(await landsInAState(page, "ollama")).toBe("unavailable");
-  await expect(page.getByText("No model API in this runtime")).toBeVisible();
-  // The refusal reached the browser, and the line above is what the app made
-  // of it. Everything else stays with the fixture.
+  for (const entry of ["ollama", "openai"]) {
+    expect(await landsInAState(page, entry)).toBe("unavailable");
+    await expect(page.getByText("No model API in this runtime")).toBeVisible();
+  }
+  // The refusals reached the browser, and the line above is what the app made
+  // of them. Everything else stays with the fixture.
   expect(takeNetworkRefusals(errors)).not.toEqual([]);
 });
 

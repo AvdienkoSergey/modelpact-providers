@@ -56,8 +56,10 @@ import { CONTRACT_SCHEMA, describeContract } from "modelpact/testing";
 
 import {
   makeOllamaProvider,
+  makeOpenAiProvider,
   makePromptApiProvider,
   type OllamaConfig,
+  type OpenAiConfig,
 } from "../dist/index.js";
 import {
   makeWebGpuProvider,
@@ -112,12 +114,14 @@ export type DoorTypes = [
 
 export const ourValues = {
   makeOllamaProvider,
+  makeOpenAiProvider,
   makePromptApiProvider,
   makeWebGpuProvider,
 };
 
 export type OurTypes = [
   OllamaConfig,
+  OpenAiConfig,
   WebGpuConfig,
   WebGpuEngine,
   EngineChunk,
