@@ -204,29 +204,6 @@ test.describe("through the daemon", () => {
     await ask(second, "And of Spain, in one word.");
     await expect(messages(page)).toHaveCount(4, { timeout: 30_000 });
   });
-
-  /**
-   * A window narrow enough to overflow, declared rather than loaded — which is
-   * the only way this dialect has one, and what the mock used to be here for.
-   */
-  test("a window too narrow for the conversation says so once", async ({
-    page,
-  }) => {
-    await page.selectOption("select", "openai-narrow");
-    await opened(page);
-
-    // 64 tokens is narrower than one ordinary turn but wider than the shortest:
-    // a one-word answer measures 42 all in, and this one measures 95, so the
-    // line is crossed on the first turn rather than eventually (measured).
-    const notice = page.getByText(/outgrew the window/);
-    await ask(page, "Count from one to twenty, in words.");
-    await expect(notice).toHaveCount(1);
-
-    // Once, and once only: the window does not un-overflow, and every turn
-    // after the first is over the same line.
-    await ask(page, "And of Spain?");
-    await expect(notice).toHaveCount(1);
-  });
 });
 
 /**

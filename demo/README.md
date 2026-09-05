@@ -1,17 +1,15 @@
 # The demo
 
-Five entries over this package's four transports: a daemon over HTTP, that
-same daemon in the OpenAI dialect, the dialect again with a window declared
-narrow enough to overflow, the model inside Chrome, and a model in the tab on
-WebGPU.
+Four entries, one per transport: a daemon over HTTP, that same daemon in the
+OpenAI dialect, the model inside Chrome, and a model in the tab on WebGPU.
 
 No mock. The engine's demo has one and it belongs there; this repository is
 about what happens when there is something on the other end, and a picker where
 half the entries have nothing behind them argues the opposite. The price is
 stated rather than hidden: **on a machine with no daemon, no Gemini Nano and no
 GPU every entry answers `unavailable`**, and the page is honest and dull. A
-daemon on `127.0.0.1:11434` holding `granite4:350m` is what makes three of the
-five answer.
+daemon on `127.0.0.1:11434` holding `granite4:350m` is what makes two of the
+four answer.
 
 ```sh
 npm install   # from the repo root, once: this directory is a workspace
@@ -85,10 +83,6 @@ entirely.
 the dev server it starts. A contributor with a key exported in their shell
 should not discover that by being billed for a suite that generates on it.
 
-**It does not move `openai-narrow`.** That entry stays on the daemon whatever
-the one above does: overflowing a window takes turns, and turns on a hosted
-model are billed.
-
 ## Why it is a workspace, and not its own install
 
 Both this app and `modelpact-providers` reach for `modelpact`. Installed
@@ -113,7 +107,6 @@ an install ever nests a second copy anyway.
 | The interrupted answer vanishing    | only completed turns reach `session.history()`                                  |
 | The meter beside the picker         | `session.usage()`                                                               |
 | The chip beside it                  | `AccessKind`, one line per branch of `ModelAccess`                              |
-| "The conversation outgrew…"         | `oncontextoverflow`, fired once, on the `openai-narrow` entry                   |
 | "Download them" before a fetch      | the `needs-download` branch, not opened unasked                                 |
 | Reload, and it is still there       | `session.history()` out, `open({ history })` back in                            |
 | A second tab staying in step        | the `storage` event, not a contract feature                                     |
@@ -134,13 +127,6 @@ That is not a shortcut around a key — it is the reason the config has a
 `baseUrl` at all. A key belongs on a server you run, never in a page anyone can
 load. Put it beside the `ollama` entry in the network panel and the only
 difference is the URL.
-
-**OpenAI dialect · narrow window** is the same again with `contextWindow: 64`.
-No server in this dialect reports the window it loaded a model with, so that
-number is a declaration rather than a discovery — and being a declaration is
-what makes it a budget: one ordinary turn measures about 95 tokens all in, so
-the first one crosses the line and the notice appears. This entry is what a
-mock used to be here for, done by a real transport instead.
 
 The Chrome entry needs no configuring. What it usually lands on is
 `needs-download`, and that branch is not opened for you: Gemini Nano is

@@ -181,7 +181,7 @@ nothing else behind it: no mock, because the engine's demo has one and this
 repository is about what happens when there is something on the other end. On a
 machine with no daemon, no Gemini Nano and no GPU, every entry therefore answers
 `unavailable` — honest, and dull. A daemon on `127.0.0.1:11434` holding
-`granite4:350m` is what makes three of the five entries answer.
+`granite4:350m` is what makes two of the four entries answer.
 
 ```sh
 npm install
@@ -212,7 +212,7 @@ npx playwright install chromium   # once
 npm run test:e2e                  # the demo server starts itself
 ```
 
-Twelve specs. The vitest suites next to each backend check its logic against
+Eleven specs. The vitest suites next to each backend check its logic against
 the contract from node; these check what node cannot see:
 
 - a page is not node. `fetch` held on its own throws `Illegal invocation` in
@@ -223,12 +223,12 @@ the contract from node; these check what node cannot see:
 - the emitted `.d.ts` files, a bundler, and React sit between the app and the
   backend, which no unit test reproduces.
 
-Six of them want a daemon and skip without one — everything that needs a
+Seven of them want a daemon and skip without one — everything that needs a
 session to actually open, which since the mock left the picker means every
 promise the contract makes about a session. That is the cost of a demo about
 transports, and it is paid where it belongs: CI installs a daemon for this job.
 
-The other six assert a branch rather than a machine, and are green anywhere. A
+The other four assert a branch rather than a machine, and are green anywhere. A
 runner with no Gemini Nano and no GPU still has `unavailable` to land on, and
 landing on it is the claim. Both HTTP transports get their refusal answer on
 every machine too, including a laptop with Ollama running, because that spec
@@ -268,7 +268,7 @@ Two options on top of that:
   without one. Install Ollama, `ollama serve`, `ollama pull granite4:350m`, and
   cache `~/.ollama/models` — the `e2e` job does exactly this, restore-only,
   sharing the key the `ollama` job saves. Without it the suite still passes,
-  on the six specs that assert a branch rather than a session.
+  on the four specs that assert a branch rather than a session.
 - **The report on failure**, which is `actions/upload-artifact` over
   `playwright-report/`. Playwright writes it whether or not anyone collects it.
 

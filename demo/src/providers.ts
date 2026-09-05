@@ -1,9 +1,8 @@
 /**
  * The app's list of backends, and every one of them is this package.
  *
- * Five entries over four transports: a daemon over HTTP, that same daemon in
- * the OpenAI dialect, the dialect again with a window declared narrow enough
- * to overflow, the model inside Chrome, and a model in the tab. There is no
+ * Four entries, one per transport: a daemon over HTTP, that same daemon in the
+ * OpenAI dialect, the model inside Chrome, and a model in the tab. There is no
  * mock here on purpose. The engine's demo has one, and it belongs there: this
  * repository is about what happens when there is something on the other end,
  * and a picker where half the entries have nothing behind them argues the
@@ -58,18 +57,6 @@ export const PROVIDERS = defineProviders({
   // network panel and the only difference is the URL — and with a key exported,
   // that URL is the only thing that changes to reach a hosted model instead.
   openai: makeOpenAiProvider(OPENAI_CONFIG),
-  // The window here is a budget the caller declares, not one the server loaded
-  // — no server in this dialect takes one — so a narrow one is staged by
-  // declaring it and letting the counts cross it on the first turn. It is what
-  // a mock used to be here for, done by a real transport instead.
-  //
-  // Pinned to the daemon whatever the entry above does: overflowing a window
-  // takes turns, and turns on a hosted model are billed.
-  "openai-narrow": makeOpenAiProvider({
-    model: LOCAL_MODEL,
-    baseUrl: LOCAL_OPENAI_BASE_URL,
-    contextWindow: 64,
-  }),
   // Chrome's own, which needs no configuring and no daemon. On a browser
   // without it `access` answers `unavailable`; on one with it undownloaded,
   // the weights are gigabytes, which is what the consent button exists for.
@@ -95,8 +82,6 @@ export function getProviderLabel(providerName: ProviderName): string {
       return HOSTED
         ? `OpenAI · ${HOSTED_MODEL}`
         : "OpenAI dialect · 127.0.0.1/v1";
-    case "openai-narrow":
-      return "OpenAI dialect · narrow window";
     case "prompt-api":
       return "Chrome · built-in model";
     case "webgpu":
