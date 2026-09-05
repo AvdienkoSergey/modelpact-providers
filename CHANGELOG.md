@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/AvdienkoSergey/modelpact-providers/compare/v1.0.0...v1.1.0) (2026-09-05)
+
+
+### Features
+
+* the three transports, moved in from the engine ([08a23e4](https://github.com/AvdienkoSergey/modelpact-providers/commit/08a23e48b1e7bc90e1011d5b3ed0946294be740a))
+* the three transports, moved in from the engine ([e8a5281](https://github.com/AvdienkoSergey/modelpact-providers/commit/e8a52811d8f60d0b8b4c00c392a99e20a0d7e829))
+
 ## 1.0.0 (2026-09-04)
 
 
