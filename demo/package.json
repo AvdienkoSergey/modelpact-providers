@@ -1,0 +1,29 @@
+{
+  "name": "modelpact-providers-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:deps": "npm --prefix .. run build",
+    "predev": "npm run build:deps",
+    "prebuild": "npm run build:deps",
+    "pretypecheck": "npm run build:deps",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.84",
+    "modelpact": "^2.2.1",
+    "modelpact-providers": "file:..",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "~6.0.3",
+    "vite": "^8.2.2"
+  }
+}

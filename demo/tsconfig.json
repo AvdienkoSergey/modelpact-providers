@@ -1,0 +1,24 @@
+{
+  // The demo's own, not the package's: React code under the package's extra
+  // strictness spends its time on ceremony rather than on showing the API.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    // No ambient types for the Prompt API and none for `@mlc-ai/web-llm`, on
+    // purpose. `src/surface.ts` makes that claim about the emitted `.d.ts`
+    // files; this is the same claim made by an app that actually consumes
+    // them, and it is the place the demo caught it the first time.
+    "types": ["vite/client"]
+  },
+  "include": ["src", "vite.config.ts"]
+}

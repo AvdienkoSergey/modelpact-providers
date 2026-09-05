@@ -7,7 +7,13 @@ export default defineConfig(
   // `src/surface.ts` is compiled and never run, by `tsconfig.surface.json`
   // alone: it imports from `../dist`, which does not exist until a build, so
   // no lint project can read it.
-  { ignores: ["dist/**", "src/surface.ts"] },
+  //
+  // `demo/` has a tsconfig of its own, so the type-aware rules here read it
+  // without types and report on what they cannot see — a `let` set from a
+  // cleanup closure comes back as "always falsy". `npm run demo:check` is what
+  // checks it. `e2e/` stays: it has a tsconfig too, and the project service
+  // finds it.
+  { ignores: ["dist/**", "demo/**", "src/surface.ts"] },
   {
     files: ["**/*.ts", "**/*.js"],
     extends: [

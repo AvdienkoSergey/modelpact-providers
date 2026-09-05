@@ -84,3 +84,58 @@ jobs:
           ollama pull "$OLLAMA_MODEL"
 
       - run: npm test
+
+  # The demo in a browser, which is the only place two of the three transports
+  # can be run at all: `LanguageModel` and `navigator.gpu` do not exist in the
+  # node suites above, and a `fetch` held on its own behaves differently in a
+  # page than in node. Its own job because it installs a browser and a daemon,
+  # and because a red browser suite should name the browser rather than hide
+  # inside the type-check job.
+  e2e:
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ubuntu-latest
+    env:
+      OLLAMA_MODEL: granite4:350m
+      OLLAMA_MODELS: /home/runner/.ollama/models
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # One install for both: `demo` is a workspace, so this is also what puts
+      # a single copy of `modelpact` where the demo and this package both find
+      # it. Playwright's own browsers are not npm packages and come next.
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # The daemon, so the Ollama spec runs rather than skips. Restore-only:
+      # the `ollama` job above owns this key and is what saves it, so the two
+      # jobs do not race to write the same cache.
+      - run: curl -fsSL https://ollama.com/install.sh | sh
+      - uses: actions/cache/restore@v6
+        with:
+          path: /home/runner/.ollama/models
+          key: ollama-models-granite4-350m
+
+      - name: Serve, and pull if the cache missed
+        run: |
+          sudo systemctl stop ollama || true
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:11434/api/tags > /dev/null && break
+            sleep 1
+          done
+          ollama pull "$OLLAMA_MODEL"
+
+      # `playwright.config.ts` starts the demo itself, and its `predev` builds
+      # `dist/` first — the specs read this package the way npm hands it over,
+      # through `exports`, never through `src/`.
+      - run: npm run test:e2e
+
+      - if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
