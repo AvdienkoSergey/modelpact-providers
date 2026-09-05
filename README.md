@@ -124,19 +124,117 @@ Three tsconfigs, and each has one job:
 | [`tsconfig.patched.json`](tsconfig.patched.json) | everything but WebGPU, with `skipLibCheck` off — the patch, still applying |
 | [`tsconfig.surface.json`](tsconfig.surface.json) | the emitted declarations, as a consumer receives them                      |
 
+[`demo/tsconfig.json`](demo/tsconfig.json) is the fourth, and the only one that
+is an application rather than a check: `types: ["vite/client"]`, no ambient
+Prompt API and no `@mlc-ai/web-llm`, which is the same claim made by code that
+actually imports and calls the things. It is where the demo caught the
+`MLCEngineInterface` leak the first time.
+
 ## Scripts
 
 | Script                  | What it does                                           |
 | ----------------------- | ------------------------------------------------------ |
-| `npm run typecheck`     | both source configs                                    |
+| `npm run typecheck`     | both source configs, and the specs                     |
 | `npm run lint`          | ESLint, type-aware                                     |
 | `npm run format:check`  | Prettier, check only                                   |
 | `npm test`              | Vitest; the Ollama contract suite skips with no daemon |
+| `npm run test:e2e`      | Playwright; starts the demo itself                     |
 | `npm run check:surface` | builds, then reads the declarations from outside       |
+| `npm run demo`          | the demo on a dev server                               |
+| `npm run demo:check`    | the demo's own tsconfig — a consumer with no `@types`  |
 | `npm run build`         | `dist/` — JS, declarations, maps                       |
 
 The Ollama suite wants a daemon on `127.0.0.1:11434` holding `granite4:350m`.
 Without one it skips loudly rather than passing quietly.
+
+## The demo
+
+[`demo/`](demo) is a chat with all three transports behind one picker, plus the
+engine's mock for the two branches a real backend cannot stage on demand.
+
+```sh
+npm install
+npm run demo
+```
+
+It takes `modelpact` from npm, at the version a stranger would get, and this
+package from `file:..` through its own `exports` — so what runs in the page is
+`dist/`, never `src/`. Both land on one copy of the engine because `demo` is a
+workspace of this repository; the reason that matters, and what breaks without
+it, is in [`demo/README.md`](demo/README.md).
+
+It also type-checks itself with `types: ["vite/client"]` and nothing else,
+which makes it the second half of the surface guard above: a declaration that
+needs an ambient global fails in an app that never installed one.
+
+## The browser suite
+
+[`e2e/demo-e2e.spec.ts`](e2e/demo-e2e.spec.ts) drives the demo in Chromium.
+
+```sh
+npx playwright install chromium   # once
+npm run test:e2e                  # the demo server starts itself
+```
+
+Twelve specs. The vitest suites next to each backend check its logic against
+the contract from node; these check what node cannot see:
+
+- a page is not node. `fetch` held on its own throws `Illegal invocation` in
+  one and works in the other, and that bug is invisible to any vitest run;
+- `LanguageModel` and `navigator.gpu` exist in a browser and nowhere else, so
+  the Prompt API and WebGPU backends have their first real `availability()`
+  call here;
+- the emitted `.d.ts` files, a bundler, and React sit between the app and the
+  backend, which no unit test reproduces.
+
+Each spec asserts a branch, not a machine. A runner with no Gemini Nano and no
+GPU still has `unavailable` to land on, and landing on it is the claim; the
+Ollama backend gets both of its answers on every machine, because the spec for
+the second one refuses the connection itself rather than waiting for a machine
+without a daemon. One spec needs something installed — the one that has Ollama
+generate for real — and it skips without a daemon. Everything else is green on
+a laptop and on a bare runner alike.
+
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) has three jobs, and each
+can go red on its own:
+
+| Job      | Runs                                                                     |
+| -------- | ------------------------------------------------------------------------ |
+| `check`  | typecheck, lint, format, vitest, `check:surface` — one install, no model |
+| `ollama` | the same vitest suites with a daemon answering                           |
+| `e2e`    | Playwright against the demo, with a daemon, in Chromium                  |
+
+**Adding the browser suite to a fork or another pipeline** is four steps:
+
+```yaml
+- uses: actions/setup-node@v7
+  with:
+    node-version-file: .nvmrc
+    cache: npm
+# `demo` is a workspace, so this installs it too — and puts one copy of
+# `modelpact` where both it and this package find it.
+- run: npm ci
+- run: npx playwright install --with-deps chromium
+- run: npm run test:e2e
+```
+
+`npm run test:e2e` starts the demo itself, and the demo's `predev` builds
+`dist/` first, so there is no build step to add and no server to start.
+
+Two options on top of that:
+
+- **A daemon**, if you want the one spec that generates for real to run rather
+  than skip. Install Ollama, `ollama serve`, `ollama pull granite4:350m`, and
+  cache `~/.ollama/models` — the `e2e` job does exactly this, restore-only,
+  sharing the key the `ollama` job saves. Everything else about that backend,
+  the `unavailable` branch included, is asserted without it.
+- **The report on failure**, which is `actions/upload-artifact` over
+  `playwright-report/`. Playwright writes it whether or not anyone collects it.
+
+Nothing here needs a GPU or a Chrome with Gemini Nano. Those two backends
+answer `unavailable` on a plain runner, and the specs assert the branch.
 
 ## Releases
 

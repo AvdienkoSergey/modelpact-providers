@@ -29,6 +29,22 @@ npm test
 npm run build
 ```
 
+The browser suite is a job of its own, and wants a browser downloaded once:
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+It starts the demo itself. One spec wants something installed — a daemon on
+`127.0.0.1:11434` holding `granite4:350m`, which is what has Ollama generate
+for real — and skips without it. The rest assert a branch rather than a
+machine: no Gemini Nano and no GPU still land on `unavailable`, and landing on
+it is the claim.
+
+[`demo/`](demo) is a workspace, so `npm ci` installs it and there is no second
+install to remember.
+
 ## Commits
 
 [Conventional commits](https://www.conventionalcommits.org) — release-please

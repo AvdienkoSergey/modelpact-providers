@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // `node` lives here and nowhere else in the specs' sense: Playwright's
+    // declarations reference `Buffer` and its runner is a Node process.
+    // `dom-chromium-ai` is what lets a spec name `LanguageModel` inside a
+    // `page.evaluate`, which is how it asks the browser whether Chrome's own
+    // model is there at all.
+    "types": ["node", "dom-chromium-ai"]
+  },
+  "include": ["."]
+}

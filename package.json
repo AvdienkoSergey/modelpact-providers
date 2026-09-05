@@ -37,6 +37,9 @@
   "files": [
     "dist"
   ],
+  "workspaces": [
+    "demo"
+  ],
   "sideEffects": false,
   "engines": {
     "node": ">=22"
@@ -46,11 +49,14 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "demo": "npm --prefix demo run dev",
+    "demo:check": "npm --prefix demo run typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.patched.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.patched.json && tsc -p e2e --noEmit",
     "check:surface": "npm run build && tsc -p tsconfig.surface.json",
     "prepublishOnly": "npm run build"
   },
@@ -60,12 +66,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@mlc-ai/web-llm": "^0.2.84",
     "@types/dom-chromium-ai": "^0.0.17",
     "@types/node": "^26.4.1",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
-    "modelpact": "^2.2.0",
+    "modelpact": "^2.2.1",
     "patch-package": "^8.0.1",
     "prettier": "^3.9.6",
     "typescript": "~6.0.3",
