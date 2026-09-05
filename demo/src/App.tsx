@@ -122,7 +122,7 @@ function Meter({ usage }: { usage: ContextUsage }) {
 }
 
 export function App() {
-  const [providerName, setProviderName] = useState<ProviderName>("mock");
+  const [providerName, setProviderName] = useState<ProviderName>("ollama");
   const [draft, setDraft] = useState("");
   const [readsPage, setReadsPage] = useState(false);
   // Memoised because the hook reopens the session when the tools change, and

@@ -176,8 +176,12 @@ and already there. Without one, each skips loudly rather than passing quietly.
 
 ## The demo
 
-[`demo/`](demo) is a chat with all four transports behind one picker, plus the
-engine's mock for the two branches a real backend cannot stage on demand.
+[`demo/`](demo) is a chat with all four transports behind one picker, and
+nothing else behind it: no mock, because the engine's demo has one and this
+repository is about what happens when there is something on the other end. On a
+machine with no daemon, no Gemini Nano and no GPU, every entry therefore answers
+`unavailable` — honest, and dull. A daemon on `127.0.0.1:11434` holding
+`granite4:350m` is what makes three of the five entries answer.
 
 ```sh
 npm install
@@ -203,7 +207,7 @@ npx playwright install chromium   # once
 npm run test:e2e                  # the demo server starts itself
 ```
 
-Thirteen specs. The vitest suites next to each backend check its logic against
+Twelve specs. The vitest suites next to each backend check its logic against
 the contract from node; these check what node cannot see:
 
 - a page is not node. `fetch` held on its own throws `Illegal invocation` in
@@ -214,13 +218,16 @@ the contract from node; these check what node cannot see:
 - the emitted `.d.ts` files, a bundler, and React sit between the app and the
   backend, which no unit test reproduces.
 
-Each spec asserts a branch, not a machine. A runner with no Gemini Nano and no
-GPU still has `unavailable` to land on, and landing on it is the claim; the
-Ollama backend gets both of its answers on every machine, because the spec for
-the second one refuses the connection itself rather than waiting for a machine
-without a daemon. One spec needs something installed — the one that has Ollama
-generate for real — and it skips without a daemon. Everything else is green on
-a laptop and on a bare runner alike.
+Six of them want a daemon and skip without one — everything that needs a
+session to actually open, which since the mock left the picker means every
+promise the contract makes about a session. That is the cost of a demo about
+transports, and it is paid where it belongs: CI installs a daemon for this job.
+
+The other six assert a branch rather than a machine, and are green anywhere. A
+runner with no Gemini Nano and no GPU still has `unavailable` to land on, and
+landing on it is the claim. Both HTTP transports get their refusal answer on
+every machine too, including a laptop with Ollama running, because that spec
+refuses the connection itself rather than waiting for a machine without one.
 
 ## CI
 
@@ -252,11 +259,11 @@ can go red on its own:
 
 Two options on top of that:
 
-- **A daemon**, if you want the one spec that generates for real to run rather
-  than skip. Install Ollama, `ollama serve`, `ollama pull granite4:350m`, and
+- **A daemon**, which is not really optional any more: half the specs skip
+  without one. Install Ollama, `ollama serve`, `ollama pull granite4:350m`, and
   cache `~/.ollama/models` — the `e2e` job does exactly this, restore-only,
-  sharing the key the `ollama` job saves. Everything else about that backend,
-  the `unavailable` branch included, is asserted without it.
+  sharing the key the `ollama` job saves. Without it the suite still passes,
+  on the six specs that assert a branch rather than a session.
 - **The report on failure**, which is `actions/upload-artifact` over
   `playwright-report/`. Playwright writes it whether or not anyone collects it.
 

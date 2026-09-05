@@ -1,22 +1,24 @@
 /**
- * The app's list of backends. One object, and its keys are the app's provider
- * names: the switch in `getProviderLabel` below stays exhaustive because of it.
+ * The app's list of backends, and every one of them is this package.
  *
- * Four of them are this package — a daemon over HTTP, the same daemon in the
- * OpenAI dialect, the model inside Chrome, a model in the tab — and three are
- * the engine's mock with different settings. The mocks are here because two branches of `ModelAccess` cannot be
- * staged on demand by a real one: a window narrow enough to overflow in two
- * turns, and a download that finishes while you watch. Nothing outside this
- * file knows which is which, and that is the claim the rest of the demo exists
- * to make honest.
+ * Five entries over four transports: a daemon over HTTP, that same daemon in
+ * the OpenAI dialect, the dialect again with a window declared narrow enough
+ * to overflow, the model inside Chrome, and a model in the tab. There is no
+ * mock here on purpose. The engine's demo has one, and it belongs there: this
+ * repository is about what happens when there is something on the other end,
+ * and a picker where half the entries have nothing behind them argues the
+ * opposite.
  *
- * Where each import comes from is the point of the file. `modelpact` is the
- * contract and the mock, installed from npm like anyone else's; the transports
- * come from this package. Same session, same failures, same meter on either
- * side of that line.
+ * The price, stated plainly: on a machine with no daemon, no Gemini Nano and
+ * no GPU, every entry answers `unavailable`. That is a true answer and a dull
+ * page, and it is the trade this demo makes to be about transports.
+ *
+ * Where each import comes from is the other half of the point. `modelpact` is
+ * the contract, installed from npm like anyone else's; the backends are this
+ * package. Same session, same failures, same meter on either side of that line.
  */
 
-import { defineProviders, makeMockProvider } from "modelpact";
+import { defineProviders } from "modelpact";
 import {
   makeOllamaProvider,
   makeOpenAiProvider,
@@ -24,44 +26,30 @@ import {
 } from "modelpact-providers";
 import { makeWebGpuProvider } from "modelpact-providers/webgpu";
 
-/** Long enough to watch arrive, and to reach the stop button before it ends. */
-const generateReply = (input: string): readonly string[] => {
-  const askedText = input.trim().replace(/\s+/g, " ").slice(0, 60);
-  const sentence =
-    `You asked «${askedText}». There is no model behind this: the mock streams ` +
-    `a canned answer one word at a time, which is enough to show a stream, ` +
-    `an abort that leaves the session open, and a window filling up.`;
-  const words = sentence.match(/\S+\s*/g) ?? ["…"];
-  return words;
-};
-
-const MOCK_SETTINGS = { reply: generateReply, delayMs: 45 };
+/** One daemon, and the two entries below reach it through different doors. */
+const LOCAL_MODEL = "granite4:350m";
+const LOCAL_OPENAI_BASE_URL = "http://127.0.0.1:11434/v1";
 
 export const PROVIDERS = defineProviders({
-  // The control. Whatever the three below do, they do it through this session.
-  mock: makeMockProvider(MOCK_SETTINGS),
-  // Narrow enough that the second turn crosses the line.
-  "mock-narrow": makeMockProvider({ ...MOCK_SETTINGS, contextWindow: 60 }),
-  // Enough steps that the bar is something you watch rather than something
-  // you miss: the mock waits `delayMs` between them.
-  "mock-download": makeMockProvider({
-    ...MOCK_SETTINGS,
-    access: "needs-download",
-    downloadSteps: [
-      0, 0.06, 0.14, 0.23, 0.35, 0.44, 0.58, 0.7, 0.79, 0.88, 0.95, 1,
-    ],
-  }),
   // A daemon on this machine, over `fetch` and JSON. Absent one, `access`
   // answers `unavailable` and the chip says so — no throw, no hang.
-  ollama: makeOllamaProvider({ model: "granite4:350m" }),
-  // The OpenAI dialect, pointed at the same daemon's `/v1` rather than at
-  // `api.openai.com`. That is the entry: `baseUrl` moves it, `apiKey` is
-  // optional, and a page needs no secret to show it. A key in a bundle is a
-  // key handed to everyone who loads the page, so the one server this demo
-  // will talk to is the one on this machine.
+  ollama: makeOllamaProvider({ model: LOCAL_MODEL }),
+  // The same daemon, the same model, `/v1/chat/completions` instead of
+  // `/api/chat`. That is the entry: `baseUrl` moves it, `apiKey` is optional,
+  // and a page needs no secret to show it. Put the two side by side in the
+  // network panel and the only difference is the URL.
   openai: makeOpenAiProvider({
-    model: "granite4:350m",
-    baseUrl: "http://127.0.0.1:11434/v1",
+    model: LOCAL_MODEL,
+    baseUrl: LOCAL_OPENAI_BASE_URL,
+  }),
+  // The window here is a budget the caller declares, not one the server loaded
+  // — no server in this dialect takes one — so a narrow one is staged by
+  // declaring it and letting the counts cross it on the first turn. It is what
+  // a mock used to be here for, done by a real transport instead.
+  "openai-narrow": makeOpenAiProvider({
+    model: LOCAL_MODEL,
+    baseUrl: LOCAL_OPENAI_BASE_URL,
+    contextWindow: 64,
   }),
   // Chrome's own, which needs no configuring and no daemon. On a browser
   // without it `access` answers `unavailable`; on one with it undownloaded,
@@ -80,16 +68,12 @@ export const PROVIDER_NAMES = Object.keys(PROVIDERS) as ProviderName[];
 
 export function getProviderLabel(providerName: ProviderName): string {
   switch (providerName) {
-    case "mock":
-      return "Mock · engine";
-    case "mock-narrow":
-      return "Mock · narrow window";
-    case "mock-download":
-      return "Mock · downloads first";
     case "ollama":
       return "Ollama · granite4:350m";
     case "openai":
       return "OpenAI dialect · 127.0.0.1/v1";
+    case "openai-narrow":
+      return "OpenAI dialect · narrow window";
     case "prompt-api":
       return "Chrome · built-in model";
     case "webgpu":
