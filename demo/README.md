@@ -1,9 +1,15 @@
 # The demo
 
-Six backends behind one picker: three of them this package's transports — a
-daemon over HTTP, the model inside Chrome, a model in the tab on WebGPU — and
-three of them the engine's mock, which is here because two branches of
-`ModelAccess` cannot be staged on demand by a real backend.
+Four entries, one per transport: a daemon over HTTP, that same daemon in the
+OpenAI dialect, the model inside Chrome, and a model in the tab on WebGPU.
+
+No mock. The engine's demo has one and it belongs there; this repository is
+about what happens when there is something on the other end, and a picker where
+half the entries have nothing behind them argues the opposite. The price is
+stated rather than hidden: **on a machine with no daemon, no Gemini Nano and no
+GPU every entry answers `unavailable`**, and the page is honest and dull. A
+daemon on `127.0.0.1:11434` holding `granite4:350m` is what makes two of the
+four answer.
 
 ```sh
 npm install   # from the repo root, once: this directory is a workspace
@@ -16,8 +22,12 @@ That is the whole point of the app, and it is one file —
 [`src/providers.ts`](src/providers.ts):
 
 ```ts
-import { defineProviders, makeMockProvider } from "modelpact";
-import { makeOllamaProvider, makePromptApiProvider } from "modelpact-providers";
+import { defineProviders } from "modelpact";
+import {
+  makeOllamaProvider,
+  makeOpenAiProvider,
+  makePromptApiProvider,
+} from "modelpact-providers";
 import { makeWebGpuProvider } from "modelpact-providers/webgpu";
 ```
 
@@ -35,6 +45,43 @@ changes the backend and every other line stays as it was.
 > The engine still ships copies of the Ollama and Prompt API backends at
 > `modelpact@2.2.x`, from before they moved here. This app takes them from this
 > package on purpose — that import line is the thing being demonstrated.
+
+## Pointing it at hosted OpenAI
+
+The `openai` entry reaches the local daemon by default. Export a key and the
+same entry reaches `api.openai.com` instead — no tracked file to edit:
+
+```sh
+read -rs "OPENAI_API_KEY?OpenAI API key: " && export OPENAI_API_KEY
+export OPENAI_MODEL=gpt-4o-mini   # optional; that is the default
+npm run demo
+```
+
+The label in the picker changes to `OpenAI · gpt-4o-mini`, which is the only
+way to tell which server is behind that entry without opening the network
+panel.
+
+> The key is the one from [platform.openai.com](https://platform.openai.com/api-keys),
+> billed separately. A ChatGPT subscription does not come with one.
+
+**The key never reaches the page.** [`vite.config.ts`](vite.config.ts) reads it
+in Node and attaches it to a `/openai` proxy; the page is told two things and
+neither is the key — that hosting is on, and which model to ask for. Checked
+rather than asserted: a production build with the key exported contains neither
+the key nor the hosted path.
+
+Three things this deliberately does not do.
+
+**It does not survive a build.** The proxy is a dev-server feature, so hosted
+mode is gated on `command === "serve"`. A built page told it was hosted would
+fetch `/openai/v1` from whatever serves the static files and get a 404; instead
+it falls back to the daemon, and the hosted branch is dropped from the bundle
+entirely.
+
+**It does not reach the test suite.**
+[`playwright.config.ts`](../playwright.config.ts) blanks `OPENAI_API_KEY` for
+the dev server it starts. A contributor with a key exported in their shell
+should not discover that by being billed for a suite that generates on it.
 
 ## Why it is a workspace, and not its own install
 
@@ -60,20 +107,26 @@ an install ever nests a second copy anyway.
 | The interrupted answer vanishing    | only completed turns reach `session.history()`                                  |
 | The meter beside the picker         | `session.usage()`                                                               |
 | The chip beside it                  | `AccessKind`, one line per branch of `ModelAccess`                              |
-| "The conversation outgrew…"         | `oncontextoverflow`, fired once, on the narrow-window mock                      |
-| The progress line on first open     | the `needs-download` branch and its monitor                                     |
-| "Download them" before a fetch      | that branch, not opened unasked                                                 |
+| "Download them" before a fetch      | the `needs-download` branch, not opened unasked                                 |
 | Reload, and it is still there       | `session.history()` out, `open({ history })` back in                            |
 | A second tab staying in step        | the `storage` event, not a contract feature                                     |
-| The `ollama` entry answering        | a real model, through the same session as the mocks                             |
+| The `ollama` entry answering        | a daemon's own dialect, `/api/chat`                                             |
+| The `openai` entry answering        | that same daemon, reached by moving `baseUrl` and nothing else                  |
 | The `prompt-api` entry              | Chrome's own model, mapped by the same four answers                             |
 | The `webgpu` entry                  | the package's second entry point, and its optional peer dependency              |
 | **Read the page** ticked            | `ModelRequest.tools`: the mock tool from `modelpact/tools`, run inside the turn |
 | "This backend has no tool protocol" | a refusal at `access` with `tools: true`, which is WebGPU's answer today        |
 
-The Ollama entry wants a daemon on `127.0.0.1:11434` holding `granite4:350m`.
-Without one it answers `unavailable` and the chip says so — no throw, no hang,
-which is the branch the mocks cannot stage.
+Without a daemon the first three entries answer `unavailable` and the chip says
+so — no throw, no hang, which is a branch worth seeing in its own right.
+
+The OpenAI entry is that same daemon through `/v1`, and it is here to show what
+`baseUrl` buys: the dialect that reaches `api.openai.com` also reaches a server
+on this machine, and `apiKey` is left unset because a local one wants none.
+That is not a shortcut around a key — it is the reason the config has a
+`baseUrl` at all. A key belongs on a server you run, never in a page anyone can
+load. Put it beside the `ollama` entry in the network panel and the only
+difference is the URL.
 
 The Chrome entry needs no configuring. What it usually lands on is
 `needs-download`, and that branch is not opened for you: Gemini Nano is
@@ -83,15 +136,15 @@ behind the same button, for a few hundred megabytes of its own.
 **Read the page** hands the session one tool, `pageTitle`: the mock tool from
 `modelpact/tools` with the page's title behind it. The chip says
 `ready · tools` once a session has opened with it, and each transport runs it
-the way it can — the mock when its name is in the message, Ollama natively,
-Chrome by calling `execute` itself, and WebGPU not at all, which arrives as a
-refusal rather than a silently dropped request. Each call shows in the record
-as a grey line, because the record itself holds only turns.
+the way it can — Ollama and the OpenAI dialect natively, Chrome by calling
+`execute` itself, and WebGPU not at all, which arrives as a refusal rather than
+a silently dropped request. Each call shows in the record as a grey line,
+because the record itself holds only turns.
 
 ## Where the interesting parts are
 
-- [`src/providers.ts`](src/providers.ts) — the registry, the three imports, and
-  the exhaustive switch its keys buy.
+- [`src/providers.ts`](src/providers.ts) — the registry, where each backend is
+  imported from, and the exhaustive switch its keys buy.
 - [`src/useChat.ts`](src/useChat.ts) — every call into the contract. A session
   is a resource, so it lives in a ref and is closed by the effect that opened
   it.

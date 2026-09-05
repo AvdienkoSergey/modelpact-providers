@@ -1,12 +1,14 @@
 {
   "name": "modelpact-providers",
   "version": "1.1.0",
-  "description": "Language-model backends written against the modelpact contract — one transport per runtime, each green on the contract suite",
+  "description": "Language-model backends written against the modelpact contract — a daemon, the OpenAI dialect, the browser's own model, one in the tab, each green on the contract suite",
   "keywords": [
     "llm",
     "modelpact",
     "typescript",
     "ollama",
+    "openai",
+    "openai-compatible",
     "prompt-api",
     "webgpu",
     "on-device",

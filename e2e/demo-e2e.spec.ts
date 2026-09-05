@@ -92,11 +92,11 @@ function takeNetworkRefusals(errors: string[]): string[] {
   return refusals;
 }
 
-/** Asked from node, not the page: the spec skips rather than fails where no daemon runs. */
-async function daemonAnswers(): Promise<boolean> {
+/** Asked from node, not the page: the specs skip rather than fail where no daemon runs. */
+async function probeDaemon(): Promise<boolean> {
   try {
     const response = await fetch("http://127.0.0.1:11434/api/tags", {
-      signal: AbortSignal.timeout(2_000),
+      signal: AbortSignal.timeout(5_000),
     });
     return response.ok;
   } catch {
@@ -104,114 +104,106 @@ async function daemonAnswers(): Promise<boolean> {
   }
 }
 
+let daemonProbe: Promise<boolean> | null = null;
+
+/**
+ * Once per run, not once per spec. Seven specs ask, and a daemon busy
+ * generating for the previous one can miss the probe's window — which shows up
+ * as a spec silently skipping rather than failing, and a suite that quietly
+ * covers less than its output claims. Measured: one run in six lost a spec that
+ * way before this was cached.
+ */
+const daemonAnswers = (): Promise<boolean> => (daemonProbe ??= probeDaemon());
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await opened(page);
 });
 
-test("the answer arrives in pieces, and the finished turn is the record", async ({
-  page,
-}) => {
-  await composer(page).fill("Name the capital of France.");
-  await sendButton(page).click();
-  await expect(stopButton(page)).toBeVisible();
+/**
+ * The promises the contract makes about a session, on the entry the page opens
+ * with — the daemon's.
+ *
+ * There is no mock in this picker to stage them against, and that is the
+ * point: the engine's demo has one, and this repository is about what happens
+ * when there is something on the other end. The price is that these skip
+ * without a daemon, where a mock would have run anywhere.
+ */
+test.describe("through the daemon", () => {
+  test.beforeEach(async ({ page }) => {
+    test.skip(!(await daemonAnswers()), "no ollama daemon on 11434");
+    await opened(page);
+  });
 
-  // Read it partway: a stream is only a stream if there is a shorter prefix.
-  // Waiting for a few words rather than for the element — it renders an
-  // ellipsis until the first delta lands, and that is a prefix of nothing.
-  await page.waitForFunction(
-    () => (document.querySelector(".streaming")?.textContent ?? "").length > 20,
-  );
-  const partial = await page.locator(".streaming").innerText();
-  await expect(sendButton(page)).toBeVisible({ timeout: 20_000 });
+  test("the answer arrives in pieces, and the finished turn is the record", async ({
+    page,
+  }) => {
+    // Long enough to still be arriving when it is read: a stream is only a
+    // stream if there is a shorter prefix, and a one-word answer has none.
+    await composer(page).fill("Count from one to twenty, in words.");
+    await sendButton(page).click();
+    await expect(stopButton(page)).toBeVisible();
 
-  const answer = await messages(page).nth(1).innerText();
-  expect(answer.startsWith(partial)).toBe(true);
-  expect(answer.length).toBeGreaterThan(partial.length);
-  await expect(messages(page)).toHaveCount(2);
-  await expect(chip(page)).toHaveText("ready");
-});
+    // Waiting for a few words rather than for the element — it renders an
+    // ellipsis until the first delta lands, and that is a prefix of nothing.
+    await page.waitForFunction(
+      () =>
+        (document.querySelector(".streaming")?.textContent ?? "").length > 20,
+    );
+    const partial = await page.locator(".streaming").innerText();
+    await expect(sendButton(page)).toBeVisible({ timeout: 60_000 });
 
-test("stopping mid-answer keeps the words out of the record and the session open", async ({
-  page,
-}) => {
-  await composer(page).fill("This one gets interrupted");
-  await sendButton(page).click();
-  await expect(stopButton(page)).toBeVisible();
-  await expect(page.locator(".streaming")).not.toBeEmpty();
-  await stopButton(page).click();
+    const answer = await messages(page).nth(1).innerText();
+    expect(answer.startsWith(partial)).toBe(true);
+    expect(answer.length).toBeGreaterThan(partial.length);
+    await expect(messages(page)).toHaveCount(2);
+    await expect(chip(page)).toHaveText("ready");
+  });
 
-  // Also the one assertion that would go red on two copies of the engine in
-  // one bundle: this notice is the `aborted` branch, and reaching it means the
-  // `AiError` thrown by the reader was `instanceof` the app's own.
-  await expect(page.getByText(/not in the record/)).toBeVisible();
-  await expect(messages(page)).toHaveCount(0);
+  test("stopping mid-answer keeps the words out of the record and the session open", async ({
+    page,
+  }) => {
+    await composer(page).fill("Write several paragraphs about the sea.");
+    await sendButton(page).click();
+    await expect(stopButton(page)).toBeVisible();
+    await expect(page.locator(".streaming")).not.toBeEmpty();
+    await stopButton(page).click();
 
-  // The session survived it, which is the other half of the promise.
-  await ask(page, "and again");
-  await expect(messages(page)).toHaveCount(2);
-});
+    // Also the one assertion that would go red on two copies of the engine in
+    // one bundle: this notice is the `aborted` branch, and reaching it means
+    // the `AiError` thrown by the reader was `instanceof` the app's own.
+    await expect(page.getByText(/not in the record/)).toBeVisible();
+    await expect(messages(page)).toHaveCount(0);
 
-test("the conversation is still there after a reload", async ({ page }) => {
-  await ask(page, "Remember this one.");
-  const before = await messages(page).allInnerTexts();
+    // The session survived it, which is the other half of the promise.
+    await ask(page, "Name the capital of France in one word.");
+    await expect(messages(page)).toHaveCount(2);
+  });
 
-  await page.reload();
-  await opened(page);
-  expect(await messages(page).allInnerTexts()).toEqual(before);
-});
+  test("the conversation is still there after a reload", async ({ page }) => {
+    await ask(page, "Name the capital of France in one word.");
+    const before = await messages(page).allInnerTexts();
 
-test("a second tab reads the same conversation and stays in step", async ({
-  page,
-  context,
-}) => {
-  await ask(page, "Written in the first tab");
-  await expect(messages(page)).toHaveCount(2);
+    await page.reload();
+    await opened(page);
+    expect(await messages(page).allInnerTexts()).toEqual(before);
+  });
 
-  const second = await context.newPage();
-  await second.goto("/");
-  await opened(second);
-  await expect(messages(second)).toHaveCount(2);
+  test("a second tab reads the same conversation and stays in step", async ({
+    page,
+    context,
+  }) => {
+    await ask(page, "Name the capital of France in one word.");
+    await expect(messages(page)).toHaveCount(2);
 
-  // The `storage` event reaches the first tab, which reopens on the new record.
-  await ask(second, "Written in the second");
-  await expect(messages(page)).toHaveCount(4, { timeout: 15_000 });
-});
+    const second = await context.newPage();
+    await second.goto("/");
+    await opened(second);
+    await expect(messages(second)).toHaveCount(2);
 
-test("a window too narrow for the conversation says so once", async ({
-  page,
-}) => {
-  await page.selectOption("select", "mock-narrow");
-  await opened(page);
-
-  const notice = page.getByText(/outgrew the window/);
-  await ask(page, "one");
-  await expect(notice).toHaveCount(0);
-
-  await ask(page, "two");
-  // Once, and once only: the window does not un-overflow, and every turn after
-  // the first is over the same line.
-  await expect(notice).toHaveCount(1);
-  await ask(page, "three");
-  await expect(notice).toHaveCount(1);
-});
-
-test("weights are not fetched until someone says to", async ({ page }) => {
-  await page.selectOption("select", "mock-download");
-  await expect(chip(page)).toHaveText("fetching weights");
-
-  // Nothing has been downloaded and nothing can be asked: the branch stops
-  // here on purpose, because on the two real backends behind it this is
-  // hundreds of megabytes or more.
-  const consent = page.getByRole("button", { name: "Download them" });
-  await expect(consent).toBeVisible();
-  await expect(sendButton(page)).toBeDisabled();
-
-  await consent.click();
-  await opened(page);
-  await expect(chip(page)).toHaveText("ready");
-  await ask(page, "Downloaded, then asked");
-  await expect(messages(page)).toHaveCount(2);
+    // The `storage` event reaches the first tab, which reopens on the new record.
+    await ask(second, "And of Spain, in one word.");
+    await expect(messages(page)).toHaveCount(4, { timeout: 30_000 });
+  });
 });
 
 /**
@@ -235,25 +227,50 @@ test("the ollama entry reaches a daemon and answers", async ({ page }) => {
 });
 
 /**
- * The same backend with nothing on the other end, which is the branch most
+ * The same daemon in the other dialect: `/v1/chat/completions` rather than
+ * `/api/chat`, reached by moving `baseUrl` and nothing else. No key is
+ * configured, which is the half of the compatible shape a page can actually
+ * show — `apiKey` is optional because a local server wants none.
+ */
+test("the openai entry reaches a compatible server and answers", async ({
+  page,
+}) => {
+  test.skip(!(await daemonAnswers()), "no ollama daemon on 11434");
+
+  await page.selectOption("select", "openai");
+  await expect(chip(page)).toHaveText("ready", { timeout: 30_000 });
+  await opened(page);
+
+  await composer(page).fill("Name the capital of France in one word.");
+  await sendButton(page).click();
+  await expect(sendButton(page)).toBeVisible({ timeout: 60_000 });
+  await expect(messages(page)).toHaveCount(2);
+  await expect(messages(page).nth(1)).not.toBeEmpty();
+});
+
+/**
+ * Both HTTP transports with nothing on the other end, which is the branch most
  * people meet first.
  *
  * The connection is refused at the network rather than by skipping this where
- * no daemon runs: that way the pair above and here assert both answers on
+ * no daemon runs: that way the specs above and here assert both answers on
  * every machine, a laptop with Ollama installed included. `access` resolves to
  * a branch — never a throw, never a hang — and the `errors` fixture is what
  * says the refused connection surfaced as neither.
  */
-test("the ollama entry says unavailable rather than throwing when nothing answers", async ({
+test("the http entries say unavailable rather than throwing when nothing answers", async ({
   page,
   errors,
 }) => {
+  // One route for both: the daemon serves `/api` and `/v1` on the same port.
   await page.route("http://127.0.0.1:11434/**", (route) => route.abort());
 
-  expect(await landsInAState(page, "ollama")).toBe("unavailable");
-  await expect(page.getByText("No model API in this runtime")).toBeVisible();
-  // The refusal reached the browser, and the line above is what the app made
-  // of it. Everything else stays with the fixture.
+  for (const entry of ["ollama", "openai"]) {
+    expect(await landsInAState(page, entry)).toBe("unavailable");
+    await expect(page.getByText("No model API in this runtime")).toBeVisible();
+  }
+  // The refusals reached the browser, and the line above is what the app made
+  // of them. Everything else stays with the fixture.
   expect(takeNetworkRefusals(errors)).not.toEqual([]);
 });
 
@@ -292,22 +309,27 @@ test("the webgpu entry, from the package's second door, lands in a state", async
 
 /**
  * A tool through the whole stack: the request carries it, the session opens
- * with it, the mock calls it when its name is in the message, and what it said
- * — this very page's title — is the end of the answer. The chip is what says
- * the open session is the one with the tool: the box changes first, and a
- * message sent before the reopen would go to the old session, which has none.
+ * with it, the model calls it inside the turn, and what it said — this very
+ * page's title — reaches the record.
+ *
+ * The chip is what says the open session is the one with the tool: the box
+ * changes first, and a message sent before the reopen would go to the old
+ * session, which has none.
  */
-test("a tool reads the page, and the answer carries what it read", async ({
+test("a tool reads the page, and what it read reaches the record", async ({
   page,
 }) => {
+  test.skip(!(await daemonAnswers()), "no ollama daemon on 11434");
+
   await page.getByLabel("Read the page").check();
-  await expect(chip(page)).toHaveText("ready · tools", { timeout: 15_000 });
+  await expect(chip(page)).toHaveText("ready · tools", { timeout: 30_000 });
   await opened(page);
 
-  await ask(page, "Use pageTitle to read this page.");
-  const assistant = page.locator(".record li.assistant");
-  await expect(assistant).toHaveCount(1);
-  await expect(assistant).toContainText("modelpact-providers demo");
+  await ask(page, "Use the pageTitle tool, then answer with the title.");
+  // The tool line, not the answer: whether the model then repeats the title in
+  // prose is the model's business, and asserting it here would make this spec
+  // a measurement of a 350M-parameter model rather than of the plumbing. That
+  // the call happened, with the page's own title behind it, is the claim.
   await expect(page.locator(".record li.tool")).toHaveText(
     "pageTitle · modelpact-providers demo",
   );
