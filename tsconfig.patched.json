@@ -1,0 +1,13 @@
+{
+  // The one third-party declaration this package patches, checked as a patch
+  // that stops applying cleanly would break it.
+  //
+  // `patches/@types+dom-chromium-ai+0.0.17.patch` closes the gap between the
+  // IDL and the spec — several states the algorithm rejects at runtime are
+  // writable in the IDL — and the only way to notice it going stale is to
+  // type-check the declaration file itself. `skipLibCheck` off does that, and
+  // the WebGPU backend is left out because `@mlc-ai/web-llm` cannot survive it.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "skipLibCheck": false },
+  "exclude": ["src/surface.ts", "src/webgpu.ts", "src/webgpu.test.ts"]
+}
